@@ -6,8 +6,8 @@ import ConfigParser
 import os
 
 ### Some global definitions
-#cfg_file='/mnt/us/extensions/seafile/seafile.cfg'
-cfg_file='seafile.cfg'
+#cfg_dir='/mnt/us/extensions/seafile'
+cfg_dir='.'
 
 def sf_ping():
     r = requests.get(url + '/api2/ping/')
@@ -37,31 +37,48 @@ def sf_get_lib_id():
             return i['id'];
     return;
 
-def sf_ls_lib():
+def sf_ls_lib(dir_entry='/'):
     hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=/', headers = hdr)
+    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr)
     return r.json();
 
-# # Returns 3 lists: 1 with filenames to erase, 2 for hashes to download
-def sf_get_modified():
+# Returns 3 lists: 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
+def sf_get_modified(dir_entry='/'):
     h_lcl={}
     h_srv={}
     h1=[]
     h2=[]
-    ## Local files list in format <hash> <filename>
-    with open(dir_local + '/.hash','a+') as f:
+    d=dir_local + dir_entry
+    print d
+    try: 
+        os.makedirs(d)
+    except OSError:
+        if not os.path.isdir(d):
+            raise
+
+    with open(d + '/.hash','a+') as f:
         for row in f:
             hash = row.split(' ', 1 )
             h_lcl[hash[0]]=hash[1]
             h1.append(hash[0])
     f.close()
-    jl=sf_ls_lib()
+    jl=sf_ls_lib(dir_entry)
     for i in jl:
         #print i
         if i['type'] == 'file':
             h_srv[i['id']]=i['name']
             h2.append(str(i['id']))
-            #print 'found file hash',i['id'],i['name']
+            print 'Found file: ',i['id'],i['name']
+        elif i['type'] == 'dir':
+            print 'Found sub-directory: ', i['name']
+            p=dir_entry+i['name']           
+            rm,dl,up=sf_get_modified(p)
+            print 'to remove:', rm
+            print 'to download:',dl
+            print 'to update:', up   
+            sf_rm(p,rm)
+            sf_dl(p,dl)
+            sf_up(p,up)
 
     f_lcl = set(h1)
     f_srv = set(h2)
@@ -82,17 +99,44 @@ def sf_get_modified():
             f_dl.append(h_srv[i])
     return f_rm , f_dl, h_srv;
 # 
-def sf_dl(dl_list):
+def sf_rm_test(dir_entry, rm_list):
+    for fname in rm_list:
+        print 'Erasing:', fname, 'at:', dir_local + dir_entry + fname.rstrip()
+    return;
+
+def sf_dl_test(dir_entry, dl_list):
+    for fname in dl_list:
+        print 'Downloading:', fname, 'to: ', dir_local + dir_entry + '/' + fname
+        hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
+        uurl = url + '/api2/repos/' + libid + '/file/?p=/' + dir_entry + '/' + fname #quote(fname.encode('utf-8'))
+        r = requests.get(uurl, headers=hdr)
+        dl_url = r.content
+        if dl_url.startswith('"') and dl_url.endswith('"'):
+            dl_url = dl_url[1:-1]
+        print 'Download URL: ', dl_url
+        rdl = requests.get(dl_url, stream=True)
+        with open( '/dev/null', 'wb' ) as f:
+            for chunk in rdl.iter_content(chunk_size=1024): 
+                if chunk: # filter out keep-alive new chunks
+                    f.write(chunk)
+    return;
+
+def sf_up_test(dir_entry, up_list):
+    for i in up_list:
+        print 'Hash updating at: ', dir_local + dir_entry, 'for file name: ', up_list[i]
+    return;
+
+def sf_dl(dir_entry, dl_list):
     for fname in dl_list:
         print 'Downloading:', fname
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-        uurl = url + '/api2/repos/' + libid + '/file/?p=/' + fname #quote(fname.encode('utf-8'))
+        uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
         r = requests.get(uurl, headers=hdr)
         dl_url = r.content
         if dl_url.startswith('"') and dl_url.endswith('"'):
             dl_url = dl_url[1:-1]
         rdl = requests.get(dl_url, stream=True)
-        with open( dir_local + '/' + fname, 'wb' ) as f:
+        with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
             for chunk in rdl.iter_content(chunk_size=1024): 
                 if chunk: # filter out keep-alive new chunks
                     f.write(chunk)
@@ -100,15 +144,15 @@ def sf_dl(dl_list):
         #print dl_url
     return;
  
-def sf_rm(rm_list):
+def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
         print "Erasing:", fname
-        os.remove(dir_local + '/' + fname.rstrip())
+        os.remove(dir_local + dir_entry + fname.rstrip())
     return;
  
 ## Updates hash table
-def sf_up(up_list):
-    with open(dir_local + '/.hash','w') as h:
+def sf_up(dir_entry, up_list):
+    with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
             h.write(s.encode("UTF-8"))
@@ -116,13 +160,14 @@ def sf_up(up_list):
 
 ### --- Main start
 config = ConfigParser.RawConfigParser()
-config.read(cfg_file)
+cfg_file = cfg_dir + '/seafile.cfg'
+config.read( cfg_file )
 
-url=config.get('server','url')
-lib=config.get('server','library')
-user=config.get('server','user')
-#password=config.get('server','password')
-dir_local=config.get('kindle','local')
+url       = config.get('server', 'url')
+lib       = config.get('server', 'library')
+user      = config.get('server', 'user')
+password  = config.get('server', 'password')
+dir_local = config.get('kindle', 'local')
 
 b=sf_ping()
 print b
@@ -133,6 +178,8 @@ except ConfigParser.NoOptionError:
     token=sf_get_token()
     #print token
     config.set('server','token',token)
+    config.set('server','user','')
+    config.set('server','password','')
     with open(cfg_file, 'wb') as configfile:
         config.write(configfile)
     #print('exception caught')
@@ -142,13 +189,16 @@ rc = sf_authping()
 # #print token
 # 
 libid=sf_get_lib_id()
+#x=sf_ls_lib()
+#print x
+
 # print libid
 # 
 rm,dl,up = sf_get_modified()
 print 'to remove:', rm
 print 'to download:',dl
-print  'to up:', up   
-sf_rm(rm)
-sf_dl(dl)
-sf_up(up)
+print 'to update:', up   
+sf_rm('/',rm)
+sf_dl('/',dl)
+sf_up('/',up)
 

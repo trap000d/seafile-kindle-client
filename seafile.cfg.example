@@ -1,10 +1,7 @@
 [server]
 url = https://seafile.example.com
-user = user@mail.addr
-password = password
 library = MyBooks
-token = 698667448b5b897a34e92c6750598dd5a4c329d4
 
 [kindle]
-local = ./Books
+local = /mnt/us/documents/Seafile
 

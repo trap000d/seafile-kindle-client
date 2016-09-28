@@ -1,3 +1,2 @@
 seafile.cfg filter=git-crypt diff=git-crypt
-auth.cfg filter=git-crypt diff=git-crypt
 *.key filter=git-crypt diff=git-crypt

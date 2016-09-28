@@ -14,7 +14,6 @@ def sf_ping():
 
 def sf_authping():
     hdr = { 'Authorization' : 'Token ' + token }
-    print hdr
     r = requests.get(url + '/api2/auth/ping/', headers = hdr, verify=False)
     return r.text;
 
@@ -30,8 +29,6 @@ def sf_get_lib_id():
     r = requests.get(url + '/api2/repos/', headers = hdr, verify=False)
     jList=r.json()
     for i in jList:
-        #print i['name']
-        #print i['id']
         if i['name'] == lib:
             return i['id'];
     return;
@@ -47,8 +44,8 @@ def sf_get_modified(dir_entry='/'):
     h_srv={}
     h1=[]
     h2=[]
+
     d=dir_local + dir_entry
-    print d
     try: 
         os.makedirs(d)
     except OSError:
@@ -63,30 +60,20 @@ def sf_get_modified(dir_entry='/'):
     f.close()
     jl=sf_ls_lib(dir_entry)
     for i in jl:
-        #print i
         if i['type'] == 'file':
             h_srv[i['id']]=i['name']
             h2.append(str(i['id']))
-            print 'Found file: ',i['id'],i['name']
         elif i['type'] == 'dir':
-            print 'Found sub-directory: ', i['name']
             p=dir_entry+i['name']           
             rm,dl,up=sf_get_modified(p)
-            print 'to remove:', rm
-            print 'to download:',dl
-            print 'to update:', up   
             sf_rm(p,rm)
             sf_dl(p,dl)
             sf_up(p,up)
 
     f_lcl = set(h1)
     f_srv = set(h2)
-    #print f_lcl
-    #print f_srv
     to_erase    = f_lcl - f_srv
     to_download = f_srv - f_lcl
-    ## We'll Remove these files
-    #print to_erase
     f_rm=[]
     f_dl=[]
     for i in list(to_erase):
@@ -112,18 +99,17 @@ def sf_dl(dir_entry, dl_list):
             for chunk in rdl.iter_content(chunk_size=1024): 
                 if chunk: # filter out keep-alive new chunks
                     f.write(chunk)
-        #dl_url = r.text()
-        #print dl_url
     return;
  
 def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
-        print "Erasing:", fname
+        print 'Removing:', fname
         os.remove(dir_local + dir_entry + fname.rstrip())
     return;
  
 ## Update hash table
 def sf_up(dir_entry, up_list):
+	print 'Updating hashes...'
     with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
@@ -148,28 +134,16 @@ try:
     token=config.get('server','token')
 except ConfigParser.NoOptionError:
     token=sf_get_token()
-    #print token
     config.set('server','token',token)
     config.set('server','user','')
     config.set('server','password','')
     with open(cfg_file, 'wb') as configfile:
         config.write(configfile)
-    #print('exception caught')
 
 rc = sf_authping()
-#print rc
-# #print token
-# 
 libid=sf_get_lib_id()
-#x=sf_ls_lib()
-#print x
-
-# print libid
-# 
 rm,dl,up = sf_get_modified()
-print 'to remove:', rm
-print 'to download:',dl
-print 'to update:', up   
+
 sf_rm('/',rm)
 sf_dl('/',dl)
 sf_up('/',up)

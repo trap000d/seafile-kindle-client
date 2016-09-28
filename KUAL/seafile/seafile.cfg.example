@@ -1,0 +1,9 @@
+[server]
+url = https://seafile.example.com
+library = MyBooks
+user = user@mail.server
+password = Password
+
+[kindle]
+local = /mnt/us/documents/Seafile
+

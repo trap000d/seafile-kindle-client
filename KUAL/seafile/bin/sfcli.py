@@ -1,12 +1,16 @@
 #! /mnt/us/python/bin/python2.7
 
 import requests
-#from urllib import urlencode,quote
 import ConfigParser
 import os
 
 ### Some global definitions
 cfg_dir='/mnt/us/extensions/seafile'
+
+def cprint(s, ypos):
+    os.system('eips 1 ' + str(ypos+57) + ' ' + '"                                                                 "')
+    os.system('eips 1 ' + str(ypos+57) + ' ' + '"' + s.encode('UTF-8') + '"' )
+    return;
 
 def sf_ping():
     r = requests.get(url + '/api2/ping/', verify=False)
@@ -46,7 +50,7 @@ def sf_get_modified(dir_entry='/'):
     h2=[]
 
     d=dir_local + dir_entry
-    try: 
+    try:
         os.makedirs(d)
     except OSError:
         if not os.path.isdir(d):
@@ -64,7 +68,7 @@ def sf_get_modified(dir_entry='/'):
             h_srv[i['id']]=i['name']
             h2.append(str(i['id']))
         elif i['type'] == 'dir':
-            p=dir_entry+i['name']           
+            p=dir_entry+i['name']
             rm,dl,up=sf_get_modified(p)
             sf_rm(p,rm)
             sf_dl(p,dl)
@@ -87,7 +91,7 @@ def sf_get_modified(dir_entry='/'):
 
 def sf_dl(dir_entry, dl_list):
     for fname in dl_list:
-        print 'Downloading:', fname
+        cprint ('Downloading:'+ fname, 2)
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
         r = requests.get(uurl, headers=hdr, verify=False)
@@ -96,24 +100,25 @@ def sf_dl(dir_entry, dl_list):
             dl_url = dl_url[1:-1]
         rdl = requests.get(dl_url, stream=True, verify=False)
         with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
-            for chunk in rdl.iter_content(chunk_size=1024): 
+            for chunk in rdl.iter_content(chunk_size=1024):
                 if chunk: # filter out keep-alive new chunks
                     f.write(chunk)
     return;
- 
+
 def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
-        print 'Removing:', fname
+        cprint ('Removing:'+ fname, 2)
         os.remove(dir_local + dir_entry + fname.rstrip())
     return;
- 
+
 ## Update hash table
 def sf_up(dir_entry, up_list):
-	print 'Updating hashes...'
+    cprint ('Updating hashes...', 2)
     with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
             h.write(s.encode("UTF-8"))
+    cprint(' ', 2)
     return;
 
 ### --- Main start
@@ -127,8 +132,8 @@ user      = config.get('server', 'user')
 password  = config.get('server', 'password')
 dir_local = config.get('kindle', 'local')
 
+cprint ('Connecting to server... ', 1 )
 b=sf_ping()
-print b
 
 try:
     token=config.get('server','token')
@@ -141,6 +146,8 @@ except ConfigParser.NoOptionError:
         config.write(configfile)
 
 rc = sf_authping()
+cprint ('Got ' + rc + ' from server', 1 )
+
 libid=sf_get_lib_id()
 rm,dl,up = sf_get_modified()
 
@@ -148,3 +155,4 @@ sf_rm('/',rm)
 sf_dl('/',dl)
 sf_up('/',up)
 
+cprint ('Done', 1)

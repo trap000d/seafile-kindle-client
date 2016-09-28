@@ -4,7 +4,7 @@
 		"name": "Seafile Sync",
 		"priority": 0,
 		"items": [
-			{"name": "[ Syncronize files ]", "priority": 1, "action": "/mnt/us/python/bin/python2.7 /mnt/us/extensions/seafile/bin/sfcli.py"},
+			{"name": "[ Synchronize files ]", "priority": 1, "action": "/mnt/us/python/bin/python2.7 /mnt/us/extensions/seafile/bin/sfcli.py"},
 			{"name": "[DON'T] Start Daemon", "priority": 2, "action": "/mnt/us/python/bin/python2.7 /mnt/us/extensions/seafile/bin/sfcli.py --daemon"},
 			{"name": "[DON'T] Stop Daemon", "priority": 3, "action": "kill `pidof sfcli.py`"},
 			{"name": "[ Edit config ]", "priority": 4, "action": "/mnt/us/extensions/seafile/bin/leafpad.sh"}

@@ -1,34 +1,33 @@
-#! /usr/bin/python
+#! /mnt/us/python/bin/python2.7
 
 import requests
-from urllib import urlencode,quote
+#from urllib import urlencode,quote
 import ConfigParser
 import os
 
 ### Some global definitions
-#cfg_dir='/mnt/us/extensions/seafile'
-cfg_dir='.'
+cfg_dir='/mnt/us/extensions/seafile'
 
 def sf_ping():
-    r = requests.get(url + '/api2/ping/')
+    r = requests.get(url + '/api2/ping/', verify=False)
     return r.text;
 
 def sf_authping():
     hdr = { 'Authorization' : 'Token ' + token }
     print hdr
-    r = requests.get(url + '/api2/auth/ping/', headers = hdr)
+    r = requests.get(url + '/api2/auth/ping/', headers = hdr, verify=False)
     return r.text;
 
 def sf_get_token():
     postdata = {'username' : user , 'password' : password}
-    r = requests.post( url + '/api2/auth-token/', data=postdata)
+    r = requests.post( url + '/api2/auth-token/', data=postdata, verify=False)
     jToken = r.json()
     token=jToken['token']
     return token;
 
 def sf_get_lib_id():
     hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    r = requests.get(url + '/api2/repos/', headers = hdr)
+    r = requests.get(url + '/api2/repos/', headers = hdr, verify=False)
     jList=r.json()
     for i in jList:
         #print i['name']
@@ -39,7 +38,7 @@ def sf_get_lib_id():
 
 def sf_ls_lib(dir_entry='/'):
     hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr)
+    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=False)
     return r.json();
 
 # Returns 3 lists: 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
@@ -98,44 +97,17 @@ def sf_get_modified(dir_entry='/'):
         if i in h_srv.keys():
             f_dl.append(h_srv[i])
     return f_rm , f_dl, h_srv;
-# 
-def sf_rm_test(dir_entry, rm_list):
-    for fname in rm_list:
-        print 'Erasing:', fname, 'at:', dir_local + dir_entry + fname.rstrip()
-    return;
-
-def sf_dl_test(dir_entry, dl_list):
-    for fname in dl_list:
-        print 'Downloading:', fname, 'to: ', dir_local + dir_entry + '/' + fname
-        hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-        uurl = url + '/api2/repos/' + libid + '/file/?p=/' + dir_entry + '/' + fname #quote(fname.encode('utf-8'))
-        r = requests.get(uurl, headers=hdr)
-        dl_url = r.content
-        if dl_url.startswith('"') and dl_url.endswith('"'):
-            dl_url = dl_url[1:-1]
-        print 'Download URL: ', dl_url
-        rdl = requests.get(dl_url, stream=True)
-        with open( '/dev/null', 'wb' ) as f:
-            for chunk in rdl.iter_content(chunk_size=1024): 
-                if chunk: # filter out keep-alive new chunks
-                    f.write(chunk)
-    return;
-
-def sf_up_test(dir_entry, up_list):
-    for i in up_list:
-        print 'Hash updating at: ', dir_local + dir_entry, 'for file name: ', up_list[i]
-    return;
 
 def sf_dl(dir_entry, dl_list):
     for fname in dl_list:
         print 'Downloading:', fname
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
-        r = requests.get(uurl, headers=hdr)
+        r = requests.get(uurl, headers=hdr, verify=False)
         dl_url = r.content
         if dl_url.startswith('"') and dl_url.endswith('"'):
             dl_url = dl_url[1:-1]
-        rdl = requests.get(dl_url, stream=True)
+        rdl = requests.get(dl_url, stream=True, verify=False)
         with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
             for chunk in rdl.iter_content(chunk_size=1024): 
                 if chunk: # filter out keep-alive new chunks
@@ -150,7 +122,7 @@ def sf_rm(dir_entry, rm_list):
         os.remove(dir_local + dir_entry + fname.rstrip())
     return;
  
-## Updates hash table
+## Update hash table
 def sf_up(dir_entry, up_list):
     with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:

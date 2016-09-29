@@ -34,8 +34,17 @@ def cprint(s, ypos):
     return;
 
 def sf_ping():
-    r = requests.get(url + '/api2/ping/', verify=False)
-    return r.text;
+    try:
+        r = requests.get(url + '/api2/ping/', verify=False, timeout=10)
+        r.raise_for_status()
+        return r.text;
+    except requests.exceptions.Timeout:
+        cprint('Timeout',2)
+    except requests.exceptions.HTTPError as e:
+        cprint('HTTP error:' + str(e), 2);
+    except requests.exceptions.RequestException as e:
+        cprint('Connection problem: ' + str(e), 2)
+    return;
 
 def sf_authping():
     hdr = { 'Authorization' : 'Token ' + token }
@@ -132,7 +141,10 @@ def sf_dl(dir_entry, dl_list):
 def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
         cprint ('Removing:'+ fname, 2)
-        os.remove(dir_local + dir_entry + '/' + fname.rstrip())
+        try:
+            os.remove(dir_local + dir_entry + '/' + fname.rstrip())
+        except OSError:
+            pass
     return;
 
 ## Update hash table
@@ -159,7 +171,9 @@ max_x     = int(config.get('kindle', 'width'))
 max_y     = int(config.get('kindle', 'height'))
 
 cprint ('Connecting to server... ', 1 )
-b=sf_ping()
+if sf_ping() == '':
+    cprint('E Server not available', 1)
+    quit()
 
 try:
     token=config.get('server','token')

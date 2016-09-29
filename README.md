@@ -23,7 +23,6 @@ local = /mnt/us/documents/Seafile
 At the first run script will obtain an authentication token at Seafile server and remove your login and password entries from configuration file (for security reasons).
 
 ### Known Issues/Bugs
-- Crashes if local directory doesn't exist
 - Status message position is hardcoded, assuming you've got PW3/KPV (magic number 57)
 - Non-latin characters are not shown through eips
 - No any checks of internet/WiFi availability

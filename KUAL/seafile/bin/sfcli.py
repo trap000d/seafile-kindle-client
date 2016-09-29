@@ -15,8 +15,8 @@ def spinning_cursor():
             yield cursor
 
 def spinner_up(s):
-    call(['eips', '0', '59',' '])
-    call(['eips', '0', '59', s ] )
+    call(['eips', '1', str(max_y-1),' '])
+    call(['eips', '1', str(max_y-1), s ] )
     return;
 
 def safe_str(obj):
@@ -29,8 +29,8 @@ def safe_str(obj):
 
 
 def cprint(s, ypos):
-    call(['eips', '0 ', str(ypos+57), '                                                                   '])
-    call(['eips', '1 ', str(ypos+57), safe_str(s) ] )
+    call(['eips', '0 ', str(ypos+max_y-3), ' ' * (max_x - 1)])
+    call(['eips', '3 ', str(ypos+max_y-3), safe_str(s)[:max_x-4] ] )
     return;
 
 def sf_ping():
@@ -132,7 +132,7 @@ def sf_dl(dir_entry, dl_list):
 def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
         cprint ('Removing:'+ fname, 2)
-        os.remove(dir_local + dir_entry + fname.rstrip())
+        os.remove(dir_local + dir_entry + '/' + fname.rstrip())
     return;
 
 ## Update hash table
@@ -155,6 +155,8 @@ lib       = config.get('server', 'library')
 user      = config.get('server', 'user')
 password  = config.get('server', 'password')
 dir_local = config.get('kindle', 'local')
+max_x     = int(config.get('kindle', 'width'))
+max_y     = int(config.get('kindle', 'height'))
 
 cprint ('Connecting to server... ', 1 )
 b=sf_ping()

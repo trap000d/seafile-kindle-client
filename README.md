@@ -17,16 +17,18 @@ password = Password
 
 [kindle]
 local = /mnt/us/documents/Seafile
+; screen dimensions in chars: 68x60 for PW3/KV, 48x42 for PW2
+width  = 68
+height = 60
 ```
 - KUAL -> Seafile Sync -> Synchronize files
 
 At the first run script will obtain an authentication token at Seafile server and remove your login and password entries from configuration file (for security reasons).
 
 ### Known Issues/Bugs
-- Status message position is hardcoded, assuming you've got PW3/KPV (magic number 57)
 - Non-latin characters are not shown through eips
-- No any checks of internet/WiFi availability
-- SSL certificates are ignored (verify=False) just to make it work with self-signed SSL certs
+- No any checks of internet/WiFi availability/file operations
+- SSL certificate verification ignored (verify=False) just to make it work with self-signed SSL certs
 
 ### To Do
 - Daemon mode

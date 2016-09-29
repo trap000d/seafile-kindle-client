@@ -1,15 +1,36 @@
 #! /mnt/us/python/bin/python2.7
+# -*- coding:utf-8 -*-
 
 import requests
 import ConfigParser
 import os
+from subprocess import call
 
 ### Some global definitions
 cfg_dir='/mnt/us/extensions/seafile'
 
+def spinning_cursor():
+    while True:
+        for cursor in '|/-\\':
+            yield cursor
+
+def spinner_up(s):
+    call(['eips', '0', '59',' '])
+    call(['eips', '0', '59', s ] )
+    return;
+
+def safe_str(obj):
+    """ return the byte string representation of obj """
+    try:
+        return str(obj)
+    except UnicodeEncodeError:
+        # obj is unicode
+        return unicode(obj).encode('unicode_escape')
+
+
 def cprint(s, ypos):
-    os.system('eips 1 ' + str(ypos+57) + ' ' + '"                                                                 "')
-    os.system('eips 1 ' + str(ypos+57) + ' ' + '"' + s.encode('UTF-8') + '"' )
+    call(['eips', '0 ', str(ypos+57), '                                                                   '])
+    call(['eips', '1 ', str(ypos+57), safe_str(s) ] )
     return;
 
 def sf_ping():
@@ -49,7 +70,8 @@ def sf_get_modified(dir_entry='/'):
     h1=[]
     h2=[]
 
-    d=dir_local + dir_entry
+    d=os.path.normpath(dir_local + dir_entry)
+
     try:
         os.makedirs(d)
     except OSError:
@@ -100,8 +122,10 @@ def sf_dl(dir_entry, dl_list):
             dl_url = dl_url[1:-1]
         rdl = requests.get(dl_url, stream=True, verify=False)
         with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
-            for chunk in rdl.iter_content(chunk_size=1024):
+            spinner = spinning_cursor()
+            for chunk in rdl.iter_content(chunk_size=65536):
                 if chunk: # filter out keep-alive new chunks
+                    spinner_up(spinner.next())
                     f.write(chunk)
     return;
 

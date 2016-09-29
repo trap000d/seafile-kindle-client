@@ -26,8 +26,10 @@ height = 60
 At the first run script will obtain an authentication token at Seafile server and remove your login and password entries from configuration file (for security reasons).
 
 ### Known Issues/Bugs
+- Only one way synchronization
+- Client doesn't erase sub-directory (and it's contents) if it's not exist on the server
 - Non-latin characters are not shown through eips
-- No any checks of internet/WiFi availability/file operations
+- Just rudimentary checks of internet/WiFi availability/file operations
 - SSL certificate verification ignored (verify=False) just to make it work with self-signed SSL certs
 
 ### To Do

@@ -4,6 +4,7 @@
 import requests
 import ConfigParser
 import os
+import shutil
 from subprocess import call
 
 ### Some global definitions
@@ -40,8 +41,10 @@ def sf_ping():
         return r.text;
     except requests.exceptions.Timeout:
         cprint('Timeout',2)
+        return;
     except requests.exceptions.HTTPError as e:
         cprint('HTTP error:' + str(e), 2);
+        return;
     except requests.exceptions.RequestException as e:
         cprint('Connection problem: ' + str(e), 2)
     return;
@@ -72,15 +75,13 @@ def sf_ls_lib(dir_entry='/'):
     r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=False)
     return r.json();
 
-# Returns 3 lists: 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
+# Returns 4 lists: 0 - with directories to erase, 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
 def sf_get_modified(dir_entry='/'):
     h_lcl={}
     h_srv={}
     h1=[]
     h2=[]
-
     d=os.path.normpath(dir_local + dir_entry)
-
     try:
         os.makedirs(d)
     except OSError:
@@ -93,20 +94,32 @@ def sf_get_modified(dir_entry='/'):
             h_lcl[hash[0]]=hash[1]
             h1.append(hash[0])
     f.close()
+    subdirs_local=[name for name in os.listdir(d) if os.path.isdir(os.path.join(d, name)) and not name.endswith('.sdr')]
+
     jl=sf_ls_lib(dir_entry)
+    subdirs_srv=[]
     for i in jl:
         if i['type'] == 'file':
             h_srv[i['id']]=i['name']
             h2.append(str(i['id']))
         elif i['type'] == 'dir':
             p=dir_entry+i['name']
-            rm,dl,up=sf_get_modified(p)
+            subdirs_srv.append(i['name'])
+            dr,rm,dl,up=sf_get_modified(p+'/')
+            sf_dr(p,dr)
             sf_rm(p,rm)
             sf_dl(p,dl)
             sf_up(p,up)
 
     f_lcl = set(h1)
     f_srv = set(h2)
+
+    d_lcl = set(subdirs_local)
+    d_srv = set(subdirs_srv)
+
+    dir_to_erase= d_lcl - d_srv
+    d_rm = list(dir_to_erase)
+
     to_erase    = f_lcl - f_srv
     to_download = f_srv - f_lcl
     f_rm=[]
@@ -118,7 +131,7 @@ def sf_get_modified(dir_entry='/'):
     for i in list(to_download):
         if i in h_srv.keys():
             f_dl.append(h_srv[i])
-    return f_rm , f_dl, h_srv;
+    return d_rm, f_rm , f_dl, h_srv;
 
 def sf_dl(dir_entry, dl_list):
     for fname in dl_list:
@@ -143,6 +156,16 @@ def sf_rm(dir_entry, rm_list):
         cprint ('Removing:'+ fname, 2)
         try:
             os.remove(dir_local + dir_entry + '/' + fname.rstrip())
+        except OSError:
+            pass
+    return;
+
+## remove directories from list
+def sf_dr(dir_entry, dir_list):
+    for dirname in dir_list:
+        cprint('Removing:' + dirname, 2)
+        try:
+            shutil.rmtree(os.path.normpath(dir_local + dir_entry + dirname)) 
         except OSError:
             pass
     return;
@@ -189,8 +212,10 @@ rc = sf_authping()
 cprint ('Got ' + rc + ' from server', 1 )
 
 libid=sf_get_lib_id()
-rm,dl,up = sf_get_modified()
 
+dr,rm,dl,up = sf_get_modified()
+
+sf_dr('/',dr)
 sf_rm('/',rm)
 sf_dl('/',dl)
 sf_up('/',up)

@@ -6,7 +6,7 @@ Simple client for synchronization between Kindle and Seafile server. Currently l
 - Your kindle must be jailbroken
 - Install python for kindle http://www.mobileread.com/forums/showthread.php?t=225030
 - Copy the contents of KUAL/seafile directory into /mnt/us/extensions/seafile
-- Create directory directory for local files (see config file -> /mnt/us/documents/Seafile)
+- Create directory for files to synchronize (see config file -> /mnt/us/documents/Seafile)
 - Copy seafile.cfg.example to seafile.cfg, set there proper server address, library name, your login and password (as well as path to local directory):
 ```
 [server]
@@ -27,7 +27,6 @@ At the first run script will obtain an authentication token at Seafile server an
 
 ### Known Issues/Bugs
 - Only one way synchronization
-- Client doesn't erase sub-directory (and it's contents) if it's not exist on the server
 - Non-latin characters are not shown through eips
 - Just rudimentary checks of internet/WiFi availability/file operations
 - SSL certificate verification ignored (verify=False) just to make it work with self-signed SSL certs

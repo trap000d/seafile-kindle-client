@@ -36,7 +36,7 @@ def cprint(s, ypos):
 
 def sf_ping():
     try:
-        r = requests.get(url + '/api2/ping/', verify=False, timeout=10)
+        r = requests.get(url + '/api2/ping/', verify=ca_verify, timeout=10)
         r.raise_for_status()
         return r.text;
     except requests.exceptions.Timeout:
@@ -51,19 +51,19 @@ def sf_ping():
 
 def sf_authping():
     hdr = { 'Authorization' : 'Token ' + token }
-    r = requests.get(url + '/api2/auth/ping/', headers = hdr, verify=False)
+    r = requests.get(url + '/api2/auth/ping/', headers = hdr, verify=ca_verify)
     return r.text;
 
 def sf_get_token():
     postdata = {'username' : user , 'password' : password}
-    r = requests.post( url + '/api2/auth-token/', data=postdata, verify=False)
+    r = requests.post( url + '/api2/auth-token/', data=postdata, verify=ca_verify)
     jToken = r.json()
     token=jToken['token']
     return token;
 
 def sf_get_lib_id():
     hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    r = requests.get(url + '/api2/repos/', headers = hdr, verify=False)
+    r = requests.get(url + '/api2/repos/', headers = hdr, verify=ca_verify)
     jList=r.json()
     for i in jList:
         if i['name'] == lib:
@@ -72,7 +72,7 @@ def sf_get_lib_id():
 
 def sf_ls_lib(dir_entry='/'):
     hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=False)
+    r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=ca_verify)
     return r.json();
 
 # Returns 4 lists: 0 - with directories to erase, 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
@@ -138,11 +138,11 @@ def sf_dl(dir_entry, dl_list):
         cprint ('Downloading:'+ fname, 2)
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
-        r = requests.get(uurl, headers=hdr, verify=False)
+        r = requests.get(uurl, headers=hdr, verify=ca_verify)
         dl_url = r.content
         if dl_url.startswith('"') and dl_url.endswith('"'):
             dl_url = dl_url[1:-1]
-        rdl = requests.get(dl_url, stream=True, verify=False)
+        rdl = requests.get(dl_url, stream=True, verify=ca_verify)
         with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
             spinner = spinning_cursor()
             for chunk in rdl.iter_content(chunk_size=65536):
@@ -189,9 +189,17 @@ url       = config.get('server', 'url')
 lib       = config.get('server', 'library')
 user      = config.get('server', 'user')
 password  = config.get('server', 'password')
+cert      = config.get('server', 'cert')
 dir_local = config.get('kindle', 'local')
 max_x     = int(config.get('kindle', 'width'))
 max_y     = int(config.get('kindle', 'height'))
+
+if cert == 'False':
+    ca_verify = False
+elif cert == 'True':
+    ca_verify = True
+else:
+    ca_verify = cert
 
 cprint ('Connecting to server... ', 1 )
 if sf_ping() == '':

@@ -3,6 +3,8 @@ url = https://seafile.example.com
 library = MyBooks
 user = user@mail.server
 password = Password
+; SSL certificate verify options: True, False or path to self-signed crt file
+cert = False
 
 [kindle]
 local = /mnt/us/documents/Seafile

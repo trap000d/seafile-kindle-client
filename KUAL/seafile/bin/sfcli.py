@@ -10,16 +10,6 @@ from subprocess import call
 ### Some global definitions
 cfg_dir='/mnt/us/extensions/seafile'
 
-def spinning_cursor():
-    while True:
-        for cursor in '|/-\\':
-            yield cursor
-
-def spinner_up(s):
-    call(['eips', '1', str(max_y-1),' '])
-    call(['eips', '1', str(max_y-1), s ] )
-    return;
-
 def safe_str(obj):
     """ return the byte string representation of obj """
     try:
@@ -30,8 +20,16 @@ def safe_str(obj):
 
 
 def cprint(s, ypos):
-    call(['eips', '0 ', str(ypos+max_y-3), ' ' * (max_x - 1)])
     call(['eips', '3 ', str(ypos+max_y-3), safe_str(s)[:max_x-4] ] )
+    return;
+
+def cclear(xpos, ypos, len):
+    call(['eips', str(xpos), str(ypos+max_y-3), ' ' * len])
+    return;
+
+def cout(xpos, ypos, c):
+    call(['eips', str(xpos), str(ypos+max_y-3), ' '])
+    call(['eips', str(xpos+1), str(ypos+max_y-3),  c ])
     return;
 
 def sf_ping():
@@ -134,8 +132,9 @@ def sf_get_modified(dir_entry='/'):
     return d_rm, f_rm , f_dl, h_srv;
 
 def sf_dl(dir_entry, dl_list):
+    cclear(0,2,40)
     for fname in dl_list:
-        cprint ('Downloading:'+ fname, 2)
+        cprint ('Downloading:',2)
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
@@ -143,12 +142,22 @@ def sf_dl(dir_entry, dl_list):
         if dl_url.startswith('"') and dl_url.endswith('"'):
             dl_url = dl_url[1:-1]
         rdl = requests.get(dl_url, stream=True, verify=ca_verify)
-        with open( dir_local + dir_entry + '/' + fname, 'wb' ) as f:
-            spinner = spinning_cursor()
+        cclear(15,2,10)
+        d = dir_local + dir_entry
+        try:
+            os.makedirs(d)
+        except OSError:
+            if not os.path.isdir(d):
+                raise
+        with open( d + '/' + fname, 'wb' ) as f:
+            idx=0
             for chunk in rdl.iter_content(chunk_size=65536):
                 if chunk: # filter out keep-alive new chunks
-                    spinner_up(spinner.next())
+                    idx = idx+1
+                    cout(15 + idx%20, 2,'>')
                     f.write(chunk)
+        cclear(15,2,40)
+        cout(15,2,'OK')
     return;
 
 def sf_rm(dir_entry, rm_list):
@@ -177,7 +186,7 @@ def sf_up(dir_entry, up_list):
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
             h.write(s.encode("UTF-8"))
-    cprint(' ', 2)
+    cout(20,2,'OK')
     return;
 
 ### --- Main start
@@ -228,4 +237,6 @@ sf_rm('/',rm)
 sf_dl('/',dl)
 sf_up('/',up)
 
+cclear (0,2,max_x-1)
+cclear (0,1,max_x-1)
 cprint ('Done', 1)

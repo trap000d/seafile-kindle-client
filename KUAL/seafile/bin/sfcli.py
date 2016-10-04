@@ -12,16 +12,6 @@ from subprocess import call
 ### Some global definitions
 cfg_dir='/mnt/us/extensions/seafile'
 
-def spinning_cursor():
-    while True:
-        for cursor in '|/-\\':
-            yield cursor
-
-def spinner_up(s):
-    call(['eips', '1', str(max_y-1),' '])
-    call(['eips', '1', str(max_y-1), s ] )
-    return;
-
 def safe_str(obj):
     """ return the byte string representation of obj """
     try:

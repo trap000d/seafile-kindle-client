@@ -80,13 +80,12 @@ def sf_ls_lib(dir_entry='/'):
     r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=ca_verify)
     return r.json();
 
-# Returns 5 lists: 0 - with directories to erase, 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update 4 - local files to upload
+# Returns 4 lists: 0 - with directories to erase, 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
 def sf_get_modified(dir_entry='/'):
     h_lcl={}
     h_srv={}
     h1=[]
     h2=[]
-    fl=[]
     d=os.path.normpath(dir_local + dir_entry)
     try:
         os.makedirs(d)
@@ -100,10 +99,8 @@ def sf_get_modified(dir_entry='/'):
             name = hash[1].rstrip()
             h_lcl[hash[0]]=name
             h1.append(hash[0])
-            fl.append(safe_unicode(name))
     f.close()
     subdirs_local = [safe_unicode(name) for name in os.listdir(d) if os.path.isdir(os.path.join(d, name)) and not name.endswith('.sdr')]
-    files_real    = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name))]
 
     jl=sf_ls_lib(dir_entry)
     subdirs_srv=[]
@@ -114,8 +111,7 @@ def sf_get_modified(dir_entry='/'):
         elif i['type'] == 'dir':
             p=dir_entry+i['name']
             subdirs_srv.append(i['name'])
-            dr,rm,dl,up,ul=sf_get_modified(p+'/')
-            sf_ul(p,ul)
+            dr,rm,dl,up=sf_get_modified(p+'/')
             sf_dr(p,dr)
             sf_rm(p,rm)
             sf_dl(p,dl)
@@ -123,8 +119,6 @@ def sf_get_modified(dir_entry='/'):
 
     f_lcl = set(h1)
     f_srv = set(h2)
-    f_hash = set(fl)
-    f_real = set(files_real)
 
     d_lcl = set(subdirs_local)
     d_srv = set(subdirs_srv)
@@ -134,8 +128,6 @@ def sf_get_modified(dir_entry='/'):
 
     to_erase    = f_lcl - f_srv
     to_download = f_srv - f_lcl
-    to_upload   = f_real - f_hash
-    f_ul = list(to_upload)
 
     f_rm=[]
     f_dl=[]
@@ -146,7 +138,38 @@ def sf_get_modified(dir_entry='/'):
     for i in list(to_download):
         if i in h_srv.keys():
             f_dl.append(h_srv[i])
-    return d_rm, f_rm , f_dl, h_srv, f_ul;
+    return d_rm, f_rm , f_dl, h_srv;
+
+def sf_get_ul(dir_entry='/'):
+    fl=[]
+    d=os.path.normpath(dir_local + dir_entry)
+
+    try:
+        os.makedirs(d)
+    except OSError:
+        if not os.path.isdir(d):
+            raise
+
+    with open(d + '/.hash','a+') as f:
+        for row in f:
+            hash = row.split(' ', 1 )
+            name = hash[1].rstrip()
+            fl.append(safe_unicode(name))
+    f.close()
+    files_real = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name)) and not name.startswith('.')]
+
+    jl=sf_ls_lib(dir_entry)
+    for i in jl:
+        if i['type'] == 'dir':
+            p=dir_entry+i['name']
+            ul=sf_get_ul(p+'/')
+            sf_ul(p+'/',ul)
+
+    f_hash = set(fl)
+    f_real = set(files_real)
+    to_upload   = f_real - f_hash
+    f_ul = list(to_upload)
+    return f_ul;
 
 def sf_dl(dir_entry, dl_list):
     cclear(0,2,40)
@@ -207,20 +230,23 @@ def sf_up(dir_entry, up_list):
     return;
 
 # Upload file
-def sf_ul(dir_entry, file):
-    cprint('[NOT implemented] Uploading: ',2)
-    hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
-    uurl = url + '/api2/repos/' + libid + '/upload-link/'
-    #print 'Upload URL: ',uurl
-    r = requests.get(uurl, headers=hdr, verify=ca_verify)
-    upload_link = r.json()
-    ## TODO: make a proper post request
-    ##print j
-    ##response = requests.post(
-    ##    upload_link, data={'filename': 'git.jpg', 'parent_dir': '/'},
-    ##    files={'file': open('/Users/xiez/Pictures/git.jpg', 'rb')},
-    ##    headers={'Authorization': 'Token {token}'. format(token=token)}
-    ##)
+def sf_ul(dir_entry, ul_list):
+    for lfile in ul_list:
+        cprint('Uploading new file... ',2)
+        hdr = { 'Authorization' : 'Token ' + token }
+        uurl = url + '/api2/repos/' + libid + '/upload-link/?p=' + dir_entry
+        r = requests.get(uurl, headers=hdr, verify=ca_verify)
+        upload_link = r.json()
+        response = requests.post(
+            upload_link, data={'filename': lfile, 'parent_dir': dir_entry},
+            files={'file': open( dir_local + dir_entry + lfile , 'rb')},
+            headers=hdr,
+            verify= ca_verify
+        )
+        cprint('Updating hashes...', 2)
+        with open(dir_local + dir_entry + '/.hash','a') as h:
+            s=response.text + ' ' + lfile + '\n'
+            h.write(s.encode('utf-8'))
     cout(20,2,'OK')
     return;
 
@@ -266,9 +292,10 @@ cprint ('Got ' + rc + ' from server', 1 )
 
 libid=sf_get_lib_id()
 
-dr,rm,dl,up,ul = sf_get_modified()
-
+ul = sf_get_ul()
 sf_ul('/',ul)
+
+dr,rm,dl,up = sf_get_modified()
 sf_dr('/',dr)
 sf_rm('/',rm)
 sf_dl('/',dl)

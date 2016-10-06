@@ -6,6 +6,7 @@ from requests.packages.urllib3.exceptions import SubjectAltNameWarning
 
 import ConfigParser
 import os
+import sys
 import shutil
 from subprocess import call
 
@@ -140,6 +141,15 @@ def sf_get_modified(dir_entry='/'):
             f_dl.append(h_srv[i])
     return d_rm, f_rm , f_dl, h_srv;
 
+def sf_get_push(dir_entry='/'):
+    d=os.path.normpath(dir_local + dir_push)
+    upfiles=[]
+    #files = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name)) and not name.startswith('.')]
+    for r, s, files in os.walk(d):
+        for f in files:
+            upfiles.append( os.path.join(safe_unicode(d), safe_unicode(f)) )
+    return upfiles;
+
 def sf_get_ul(dir_entry='/'):
     fl=[]
     d=os.path.normpath(dir_local + dir_entry)
@@ -250,57 +260,87 @@ def sf_ul(dir_entry, ul_list):
     cout(20,2,'OK')
     return;
 
+# Push directory to the server
+def sf_push():
+    f=sf_get_push()
+    print f
+    return;
+
 ### --- Main start
-requests.packages.urllib3.disable_warnings(SubjectAltNameWarning)
-config = ConfigParser.RawConfigParser()
-cfg_file = cfg_dir + '/seafile.cfg'
-config.read( cfg_file )
 
-url       = config.get('server', 'url')
-lib       = config.get('server', 'library')
-user      = config.get('server', 'user')
-password  = config.get('server', 'password')
-cert      = config.get('server', 'cert')
-dir_local = config.get('kindle', 'local')
-max_x     = int(config.get('kindle', 'width'))
-max_y     = int(config.get('kindle', 'height'))
+if __name__ == '__main__':
+    requests.packages.urllib3.disable_warnings(SubjectAltNameWarning)
+    config_defaults = { 'url'      :'http:/seafile.example.com',
+                        'library'  :'MyLibrary',
+                        'user'     :'user',
+                        'password' :'password',
+                        'cert'     :'True',
+                        'local'    : '/mnt/us/documents/Seafile',
+                        'upload'   : '/MyKindle',
+                        'width'    : '68',
+                        'heigh'    : '60'
+                      }
+    config = ConfigParser.RawConfigParser(config_defaults)
+    cfg_file = cfg_dir + '/seafile.cfg'
+    config.read( cfg_file )
 
-if cert == 'False':
-    ca_verify = False
-elif cert == 'True':
-    ca_verify = True
-else:
-    ca_verify = cert
+    url       = config.get('server', 'url')
+    lib       = config.get('server', 'library')
+    user      = config.get('server', 'user')
+    password  = config.get('server', 'password')
+    cert      = config.get('server', 'cert')
+    dir_local = config.get('kindle', 'local')
+    dir_push  = config.get('kindle', 'upload')
+    max_x     = int(config.get('kindle', 'width'))
+    max_y     = int(config.get('kindle', 'height'))
 
-cprint ('Connecting to server... ', 1 )
-if sf_ping() == '':
-    cprint('E Server not available', 1)
-    quit()
+    if cert == 'False':
+        ca_verify = False
+    elif cert == 'True':
+        ca_verify = True
+    else:
+        ca_verify = cert
 
-try:
-    token=config.get('server','token')
-except ConfigParser.NoOptionError:
-    token=sf_get_token()
-    config.set('server','token',token)
-    config.set('server','user','')
-    config.set('server','password','')
-    with open(cfg_file, 'wb') as configfile:
-        config.write(configfile)
+    cprint ('Connecting to server... ', 1 )
+    if sf_ping() == '':
+        cprint('Error: Server not available', 1)
+        quit()
 
-rc = sf_authping()
-cprint ('Got ' + rc + ' from server', 1 )
+    try:
+        token=config.get('server','token')
+    except ConfigParser.NoOptionError:
+        token=sf_get_token()
+        config.set('server','token',token)
+        config.set('server','user','')
+        config.set('server','password','')
+        with open(cfg_file, 'wb') as configfile:
+            config.write(configfile)
 
-libid=sf_get_lib_id()
+    rc = sf_authping()
+    cprint ('Got ' + rc + ' from server', 1 )
+    libid=sf_get_lib_id()
 
-ul = sf_get_ul()
-sf_ul('/',ul)
+    # TODO: if it running with 'push' command in command line, then force upload the directory "local+upload" to the server, then exit
+    # sf_push()
+    # return;
+    if len(sys.argv)>1:
+        if sys.argv[1]=='push':
+            push = True
+            sf_push()
+            cclear (0,2,max_x-1)
+            cclear (0,1,max_x-1)
+            cprint ('Done', 1)
+            quit()
 
-dr,rm,dl,up = sf_get_modified()
-sf_dr('/',dr)
-sf_rm('/',rm)
-sf_dl('/',dl)
-sf_up('/',up)
+    ul = sf_get_ul()
+    sf_ul('/',ul)
 
-cclear (0,2,max_x-1)
-cclear (0,1,max_x-1)
-cprint ('Done', 1)
+    dr,rm,dl,up = sf_get_modified()
+    sf_dr('/',dr)
+    sf_rm('/',rm)
+    sf_dl('/',dl)
+    sf_up('/',up)
+
+    cclear (0,2,max_x-1)
+    cclear (0,1,max_x-1)
+    cprint ('Done', 1)

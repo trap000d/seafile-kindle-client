@@ -141,16 +141,6 @@ def sf_get_modified(dir_entry='/'):
             f_dl.append(h_srv[i])
     return d_rm, f_rm , f_dl, h_srv;
 
-def sf_get_push(dir_entry='/'):
-    d=os.path.normpath(dir_local + dir_push)
-    upfiles=[]
-    #files = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name)) and not name.startswith('.')]
-    for r, s, files in os.walk(d):
-        s[:] = [x for x in s if not x.endswith('.sdr')]
-        #print 'Subdir:', s
-        for f in files:
-            upfiles.append( os.path.join(r, f) )
-    return upfiles;
 
 def sf_get_ul(dir_entry='/'):
     fl=[]
@@ -262,27 +252,58 @@ def sf_ul(dir_entry, ul_list):
     cout(20,2,'OK')
     return;
 
+def sf_get_push(dir_entry='/'):
+    d=os.path.normpath(dir_local + dir_push)
+    upfiles=[]
+    #files = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name)) and not name.startswith('.')]
+    for r, s, files in os.walk(d):
+        s[:] = [x for x in s if not x.endswith('.sdr')]
+        #print 'Subdir:', s
+        for f in files:
+            if not f.endswith('.hash'):
+                upfiles.append( os.path.join(r, f) )
+    return upfiles;
+
 # Push directory to the server
 def sf_push():
     files=sf_get_push()
+    hashlist=[]
     for f in files:
-        cprint('Uploading file...', 2)
+        fb = safe_unicode(os.path.basename(f))
+        cprint('Updating file...', 2)
         dir_entry = os.path.relpath(os.path.dirname(f), dir_local)
-        print 'Dir_entry: ', dir_entry
-        #hdr = { 'Authorization' : 'Token ' + token }
-        #uurl = url + '/api2/repos/' + libid + '/update-link/?p=' + dir_entry
-        #r = requests.get(uurl, headers=hdr, verify=ca_verify)
-        #upload_link = r.json()
-        #response = requests.post(
-        #    upload_link, data={'filename': lfile, 'parent_dir': dir_entry},
-        #    files={'file': open( dir_local + dir_entry + lfile , 'rb')},
-        #    headers=hdr,
-        #    verify= ca_verify
-        #)
-        #cprint('Updating hashes...', 2)
-        #with open(dir_local + dir_entry + '/.hash','a') as h:
-        #    s=response.text + ' ' + lfile + '\n'
-        #    h.write(s.encode('utf-8'))
+        #print 'Dir_entry: ', dir_entry
+        hdr = { 'Authorization' : 'Token ' + token }
+        uurl = url + '/api2/repos/' + libid + '/update-link/?p=/' + dir_entry
+        r = requests.get(uurl, headers=hdr, verify=ca_verify)
+        update_link = r.json()
+        response = requests.post(
+            update_link, data={'filename': fb, 'target_file': safe_unicode('/' + dir_entry + '/' + fb) },
+            files={'file': open( f , 'rb')},
+            headers=hdr,
+            verify= ca_verify
+        )
+        if response.status_code == 441: ## File not exists
+            sf_ul('/'+ dir_entry + '/', [fb])
+            return
+        if response.status_code == 200:
+            inhash= False
+            with open(os.path.normpath(dir_local + dir_push) + '/.hash','r+') as h:
+                data = h.readlines()
+                h.seek(0)
+                h.truncate()
+                for row in data:
+                    line = row.split(' ', 1 )
+                    if line[0] != '\n':
+                        name = line[1].rstrip()
+                        if fb==name:
+                            inhash = True
+                            line[0]=response.text
+                            hashlist.append(line[0]+ ' ' + name.encode('utf-8'))
+                if inhash == False:
+                    hashlist.append( response.text + ' ' + fb)
+                cprint('Updating hashes...', 2)
+                h.writelines('\n'.join(hashlist) + '\n')
     cout(20,2,'OK')
     return;
 

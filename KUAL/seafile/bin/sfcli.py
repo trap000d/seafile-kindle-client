@@ -3,6 +3,10 @@
 
 import requests
 from requests.packages.urllib3.exceptions import SubjectAltNameWarning
+import requests.packages.urllib3
+from requests.packages.urllib3.packages import six
+import email.utils
+import mimetypes
 
 import ConfigParser
 import os
@@ -13,6 +17,33 @@ from subprocess import call
 ### Some global definitions
 cfg_dir='/mnt/us/extensions/seafile'
 
+def utf8_format_header_param(name, value):
+    """
+    Helper function to format and quote a single header parameter.
+
+    Particularly useful for header parameters which might contain
+    non-ASCII values, like file names. This follows RFC 2231, as
+    suggested by RFC 2388 Section 4.4.
+
+    :param name:
+        The name of the parameter, a string expected to be ASCII only.
+    :param value:
+        The value of the parameter, provided as a unicode string.
+    """
+    if not any(ch in value for ch in '"\\\r\n'):
+        result = '%s="%s"' % (name, value)
+        try:
+            result.encode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+        else:
+            return result
+    if not six.PY3 and isinstance(value, six.text_type):  # Python 2:
+        value = value.encode('utf-8')
+    value = email.utils.encode_rfc2231(value, 'utf-8')
+    value = '%s*=%s' % (name, value)
+    return value
+    
 def safe_str(obj):
     """ return the byte string representation of obj """
     try:
@@ -241,7 +272,7 @@ def sf_ul(dir_entry, ul_list):
         upload_link = r.json()
         response = requests.post(
             upload_link, data={'filename': lfile, 'parent_dir': dir_entry},
-            files={'file': open( dir_local + dir_entry + lfile , 'rb')},
+            files={'file': open( dir_local + dir_entry + '/' + lfile , 'rb')},
             headers=hdr,
             verify= ca_verify
         )
@@ -278,13 +309,13 @@ def sf_push():
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
         update_link = r.json()
         response = requests.post(
-            update_link, data={'filename': fb, 'target_file': safe_unicode('/' + dir_entry + '/' + fb) },
-            files={'file': open( f , 'rb')},
+            update_link, data={'filename': fb, 'target_file': '/' + dir_entry + '/' + fb },
+            files={'file':( fb , open( f , 'rb').read())},
             headers=hdr,
             verify= ca_verify
         )
         if response.status_code == 441: ## File not exists
-            sf_ul('/'+ dir_entry + '/', [fb])
+            sf_ul('/'+ dir_entry, [fb])
             return
         if response.status_code == 200:
             inhash= False
@@ -360,6 +391,7 @@ if __name__ == '__main__':
     rc = sf_authping()
     cprint ('Got ' + rc + ' from server', 1 )
     libid=sf_get_lib_id()
+    requests.packages.urllib3.fields.format_header_param = utf8_format_header_param
 
     # TODO: if running with push key in command line, then force upload the directory "local+upload" to the server, then exit
     # sf_push()
@@ -374,7 +406,7 @@ if __name__ == '__main__':
             quit()
 
     ul = sf_get_ul()
-    sf_ul('/',ul)
+    sf_ul('',ul)
 
     dr,rm,dl,up = sf_get_modified()
     sf_dr('/',dr)

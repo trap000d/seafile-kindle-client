@@ -14,8 +14,6 @@ import sys
 import shutil
 from subprocess import call
 
-### Some global definitions
-cfg_dir='/mnt/us/extensions/seafile'
 
 def utf8_format_header_param(name, value):
     """
@@ -43,7 +41,7 @@ def utf8_format_header_param(name, value):
     value = email.utils.encode_rfc2231(value, 'utf-8')
     value = '%s*=%s' % (name, value)
     return value
-    
+
 def safe_str(obj):
     """ return the byte string representation of obj """
     try:
@@ -207,7 +205,7 @@ def sf_get_ul(dir_entry='/'):
 def sf_dl(dir_entry, dl_list):
     cclear(0,2,40)
     for fname in dl_list:
-        cprint ('Downloading:',2)
+        cprint ('Downloading...',2)
         hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
@@ -229,15 +227,16 @@ def sf_dl(dir_entry, dl_list):
                     idx = idx+1
                     cout(15 + idx%20, 2,'>')
                     f.write(chunk)
-        cclear(15,2,40)
-        cout(15,2,'OK')
+            cclear(15,2,40)
+            cout(15,2,'OK')
     return;
 
 def sf_rm(dir_entry, rm_list):
     for fname in rm_list:
-        cprint ('Removing:'+ fname, 2)
+        cprint ('Removing file(s)...', 2)
+        f = safe_unicode(fname.rstrip())
         try:
-            os.remove(dir_local + dir_entry + '/' + fname.rstrip())
+            os.remove(dir_local + dir_entry + '/' + f)
         except OSError:
             pass
     return;
@@ -245,7 +244,7 @@ def sf_rm(dir_entry, rm_list):
 ## remove directories from list
 def sf_dr(dir_entry, dir_list):
     for dirname in dir_list:
-        cprint('Removing:' + dirname, 2)
+        cprint('Removing directory...', 2)
         try:
             shutil.rmtree(os.path.normpath(dir_local + dir_entry + dirname)) 
         except OSError:
@@ -280,18 +279,16 @@ def sf_ul(dir_entry, ul_list):
         with open(dir_local + dir_entry + '/.hash','a') as h:
             s=response.text + ' ' + lfile + '\n'
             h.write(s.encode('utf-8'))
-    cout(20,2,'OK')
+        cout(20,2,'OK')
     return;
 
-def sf_get_push(dir_entry='/'):
+def sf_get_push():
     d=os.path.normpath(dir_local + dir_push)
     upfiles=[]
-    #files = [safe_unicode(name) for name in os.listdir(d) if os.path.isfile(os.path.join(d, name)) and not name.startswith('.')]
     for r, s, files in os.walk(d):
         s[:] = [x for x in s if not x.endswith('.sdr')]
-        #print 'Subdir:', s
         for f in files:
-            if not f.endswith('.hash'):
+            if not f.startswith('.'):
                 upfiles.append( os.path.join(r, f) )
     return upfiles;
 
@@ -300,10 +297,10 @@ def sf_push():
     files=sf_get_push()
     hashlist=[]
     for f in files:
-        fb = safe_unicode(os.path.basename(f))
+        fn = os.path.basename(f)
+        fb = safe_unicode(fn)
         cprint('Updating file...', 2)
         dir_entry = os.path.relpath(os.path.dirname(f), dir_local)
-        #print 'Dir_entry: ', dir_entry
         hdr = { 'Authorization' : 'Token ' + token }
         uurl = url + '/api2/repos/' + libid + '/update-link/?p=/' + dir_entry
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
@@ -327,15 +324,15 @@ def sf_push():
                     line = row.split(' ', 1 )
                     if line[0] != '\n':
                         name = line[1].rstrip()
-                        if fb==name:
+                        if fn==name:
                             inhash = True
                             line[0]=response.text
-                            hashlist.append(line[0]+ ' ' + name.encode('utf-8'))
+                            hashlist.append(line[0]+ ' ' + name.decode('utf-8'))
                 if inhash == False:
-                    hashlist.append( response.text + ' ' + fb)
+                    hashlist.append( response.text + ' ' + fn.decode('utf-8'))
                 cprint('Updating hashes...', 2)
-                h.writelines('\n'.join(hashlist) + '\n')
-    cout(20,2,'OK')
+                h.writelines(('\n'.join(hashlist) + '\n').encode('utf-8'))
+        cout(20,2,'OK')
     return;
 
 ### --- Main start
@@ -352,6 +349,9 @@ if __name__ == '__main__':
                         'width'    : '68',
                         'heigh'    : '60'
                       }
+    ### Some hardcoded path
+    cfg_dir='/mnt/us/extensions/seafile'
+
     config = ConfigParser.RawConfigParser(config_defaults)
     cfg_file = cfg_dir + '/seafile.cfg'
     config.read( cfg_file )
@@ -393,9 +393,6 @@ if __name__ == '__main__':
     libid=sf_get_lib_id()
     requests.packages.urllib3.fields.format_header_param = utf8_format_header_param
 
-    # TODO: if running with push key in command line, then force upload the directory "local+upload" to the server, then exit
-    # sf_push()
-    # return;
     if len(sys.argv)>1:
         if sys.argv[1]=='push':
             push = True
@@ -406,7 +403,7 @@ if __name__ == '__main__':
             quit()
 
     ul = sf_get_ul()
-    sf_ul('',ul)
+    sf_ul('/',ul)
 
     dr,rm,dl,up = sf_get_modified()
     sf_dr('/',dr)

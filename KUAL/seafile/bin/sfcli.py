@@ -193,16 +193,21 @@ def sf_get_ul(dir_entry='/'):
     for i in jl:
         if i['type'] == 'dir':
             p=dir_entry+i['name']
-            ul=sf_get_ul(p+'/')
+            ul,rms=sf_get_ul(p+'/')
             sf_ul(p+'/',ul)
+            sf_rm_srv(p+'/', rms)
 
     f_hash = set(fl)
     f_real = set(files_real)
     to_upload   = f_real - f_hash
+    to_remove_srv = f_hash - f_real
     f_ul = list(to_upload)
-    return f_ul;
+    f_rm_srv = list(to_remove_srv)
+    return f_ul, f_rm_srv;
 
 def sf_dl(dir_entry, dl_list):
+    if not dl_list:
+        return
     cclear(0,2,40)
     for fname in dl_list:
         cprint ('Downloading...',2)
@@ -228,10 +233,12 @@ def sf_dl(dir_entry, dl_list):
                     cout(15 + idx%20, 2,'>')
                     f.write(chunk)
             cclear(15,2,40)
-            cout(15,2,'OK')
+            cout(25,2,'OK')
     return;
 
 def sf_rm(dir_entry, rm_list):
+    if not rm_list:
+        return
     for fname in rm_list:
         cprint ('Removing file(s)...', 2)
         f = safe_unicode(fname.rstrip())
@@ -243,6 +250,8 @@ def sf_rm(dir_entry, rm_list):
 
 ## remove directories from list
 def sf_dr(dir_entry, dir_list):
+    if not dir_list:
+        return
     for dirname in dir_list:
         cprint('Removing directory...', 2)
         try:
@@ -253,16 +262,20 @@ def sf_dr(dir_entry, dir_list):
 
 ## Update hash table
 def sf_up(dir_entry, up_list):
+    if not up_list:
+        return
     cprint ('Updating hashes...', 2)
     with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
             h.write(s.encode("UTF-8"))
-    cout(20,2,'OK')
+    cout(25,2,'OK')
     return;
 
 # Upload file
 def sf_ul(dir_entry, ul_list):
+    if not ul_list:
+        return
     for lfile in ul_list:
         cprint('Uploading new file... ',2)
         hdr = { 'Authorization' : 'Token ' + token }
@@ -279,7 +292,29 @@ def sf_ul(dir_entry, ul_list):
         with open(dir_local + dir_entry + '/.hash','a') as h:
             s=response.text + ' ' + lfile + '\n'
             h.write(s.encode('utf-8'))
-        cout(20,2,'OK')
+        cout(25,2,'OK')
+    return;
+
+def sf_rm_srv(dir_entry, rm_list):
+    """Removes file(s) from rm_list at the server side
+       DELETE https://cloud.seafile.com/api2/repos/{repo-id}/file/?p=/foo
+    """
+    if not rm_list:
+        return
+    cprint('Removing on server...', 2)
+    for f in rm_list:
+        hdr = { 'Authorization' : 'Token ' + token }
+        uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + f
+        r = requests.delete(uurl, headers=hdr, verify=ca_verify)
+        if r.status_code == 200 or r.status_code == 400: ## Removed successfully or doesn't exist on server
+            with open(os.path.normpath(dir_local + dir_entry) + '/.hash','r+') as h:
+                data = h.readlines()
+                h.seek(0)
+                h.truncate()
+                for line in data:
+                    if not f in safe_unicode(line):
+                        h.write(line)
+    cout(25,2,'OK')
     return;
 
 def sf_get_push():
@@ -295,6 +330,8 @@ def sf_get_push():
 # Push directory to the server
 def sf_push():
     files=sf_get_push()
+    if not files:
+        return
     hashlist=[]
     for f in files:
         fn = os.path.basename(f)
@@ -332,7 +369,7 @@ def sf_push():
                     hashlist.append( response.text + ' ' + fn.decode('utf-8'))
                 cprint('Updating hashes...', 2)
                 h.writelines(('\n'.join(hashlist) + '\n').encode('utf-8'))
-        cout(20,2,'OK')
+        cout(25,2,'OK')
     return;
 
 ### --- Main start
@@ -402,8 +439,9 @@ if __name__ == '__main__':
             cprint ('Done', 1)
             quit()
 
-    ul = sf_get_ul()
+    ul, rms = sf_get_ul()
     sf_ul('/',ul)
+    sf_rm_srv('/', rms)
 
     dr,rm,dl,up = sf_get_modified()
     sf_dr('/',dr)

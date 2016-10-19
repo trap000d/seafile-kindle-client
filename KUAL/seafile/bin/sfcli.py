@@ -1,6 +1,9 @@
 #! /mnt/us/python/bin/python2.7
 # -*- coding:utf-8 -*-
 
+import threading
+import time
+
 import requests
 from requests.packages.urllib3.exceptions import SubjectAltNameWarning
 import requests.packages.urllib3
@@ -14,6 +17,16 @@ import sys
 import shutil
 from subprocess import call
 
+def spinning_cursor():
+    while True:
+        for cursor in '+*':
+            yield cursor
+
+def spinner():
+    s = spinning_cursor()
+    while True:
+        call(['eips', '1 ', str(1+max_y-3),  s.next() ])
+        time.sleep(1)
 
 def utf8_format_header_param(name, value):
     """
@@ -376,7 +389,7 @@ def sf_push():
 
 if __name__ == '__main__':
     requests.packages.urllib3.disable_warnings(SubjectAltNameWarning)
-    config_defaults = { 'url'      :'http:/seafile.example.com',
+    config_defaults = { 'url'      :'http://seafile.example.com',
                         'library'  :'MyLibrary',
                         'user'     :'user',
                         'password' :'password',
@@ -410,6 +423,10 @@ if __name__ == '__main__':
     else:
         ca_verify = cert
 
+    t = threading.Thread(target=spinner)
+    t.setDaemon(True)
+    t.start()
+
     cprint ('Connecting to server... ', 1 )
     if sf_ping() == '':
         cprint('Error: Server not available', 1)
@@ -428,6 +445,9 @@ if __name__ == '__main__':
     rc = sf_authping()
     cprint ('Got ' + rc + ' from server', 1 )
     libid=sf_get_lib_id()
+    if not libid:
+        cprint('Error: Library not exist on the server', 1)
+        quit()
     requests.packages.urllib3.fields.format_header_param = utf8_format_header_param
 
     if len(sys.argv)>1:

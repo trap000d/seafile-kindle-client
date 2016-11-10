@@ -35,6 +35,9 @@ def utf8_format_header_param(name, value):
     Particularly useful for header parameters which might contain
     non-ASCII values, like file names. This follows RFC 2231, as
     suggested by RFC 2388 Section 4.4.
+    Modified to encode utf-8 by default Standard function
+    from `requests` should be monkeypatched as:
+    `requests.packages.urllib3.fields.format_header_param = utf8_format_header_param`
 
     :param name:
         The name of the parameter, a string expected to be ASCII only.
@@ -98,7 +101,6 @@ def sf_ping():
     return;
 
 def sf_authping():
-    hdr = { 'Authorization' : 'Token ' + token }
     r = requests.get(url + '/api2/auth/ping/', headers = hdr, verify=ca_verify)
     return r.text;
 
@@ -110,7 +112,6 @@ def sf_get_token():
     return token;
 
 def sf_get_lib_id():
-    hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
     r = requests.get(url + '/api2/repos/', headers = hdr, verify=ca_verify)
     jList=r.json()
     for i in jList:
@@ -119,12 +120,11 @@ def sf_get_lib_id():
     return;
 
 def sf_ls_lib(dir_entry='/'):
-    hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
     r = requests.get( url + '/api2/repos/' + libid + '/dir/?p=' + dir_entry, headers = hdr, verify=ca_verify)
     return r.json();
 
-# Returns 4 lists: 0 - with directories to erase, 1 - with filenames to erase, 2 - for files to download 3 - for hashes to update
 def sf_get_modified(dir_entry='/'):
+    """ Returns 4 lists a,b,c,d : a - directories to erase, b - filenames to erase, c - files to download d - hashes to update """
     h_lcl={}
     h_srv={}
     h1=[]
@@ -185,6 +185,12 @@ def sf_get_modified(dir_entry='/'):
 
 
 def sf_get_ul(dir_entry='/'):
+    """ 
+    :param dir_entry:
+        Relative path to directory 
+    :return: 
+        list of files to upload 
+    """
     fl=[]
     d=os.path.normpath(dir_local + dir_entry)
 
@@ -221,17 +227,15 @@ def sf_get_ul(dir_entry='/'):
 def sf_dl(dir_entry, dl_list):
     if not dl_list:
         return
-    cclear(0,2,40)
-    for fname in dl_list:
-        cprint ('Downloading...',2)
-        hdr = { 'Authorization' : 'Token ' + token  , 'Accept' : 'application/json; indent=4'}
+    cclear (2,1,max_x-3)
+    for idx,fname in enumerate(dl_list):
+        cprint ('Downloading file '+ str(idx + 1) +' of ' + str(len(dl_list)) ,1)
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + '/' + fname
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
         dl_url = r.content
         if dl_url.startswith('"') and dl_url.endswith('"'):
             dl_url = dl_url[1:-1]
         rdl = requests.get(dl_url, stream=True, verify=ca_verify)
-        cclear(15,2,10)
         d = dir_local + dir_entry
         try:
             os.makedirs(d)
@@ -242,18 +246,18 @@ def sf_dl(dir_entry, dl_list):
             idx=0
             for chunk in rdl.iter_content(chunk_size=65536):
                 if chunk: # filter out keep-alive new chunks
+                    cout(2, 2, str(idx*64) + ' K')
                     idx = idx+1
-                    cout(15 + idx%20, 2,'>')
                     f.write(chunk)
-            cclear(15,2,40)
-            cout(25,2,'OK')
+            cclear(0,2,max_x-1)
     return;
 
 def sf_rm(dir_entry, rm_list):
     if not rm_list:
         return
-    for fname in rm_list:
-        cprint ('Removing file(s)...', 2)
+    cclear (2,1,max_x-3)
+    for idx,fname in enumerate(rm_list):
+        cprint ('Removing '+ str(idx) +' file of ' + str(len(rm_list)), 1)
         f = safe_unicode(fname.rstrip())
         try:
             os.remove(dir_local + dir_entry + '/' + f)
@@ -261,37 +265,38 @@ def sf_rm(dir_entry, rm_list):
             pass
     return;
 
-## remove directories from list
 def sf_dr(dir_entry, dir_list):
+    """ remove directories from list """
     if not dir_list:
         return
-    for dirname in dir_list:
-        cprint('Removing directory...', 2)
+    cclear (2,1,max_x-3)
+    for idx,dirname in enumerate(dir_list):
+        cprint('Removing directory '+ str(idx)+ ' of ' + str(len(dir_list)), 1)
         try:
             shutil.rmtree(os.path.normpath(dir_local + dir_entry + dirname)) 
         except OSError:
             pass
     return;
 
-## Update hash table
 def sf_up(dir_entry, up_list):
+    """ Update hash table """
     if not up_list:
         return
-    cprint ('Updating hashes...', 2)
+    cclear (2,1,max_x-3)
+    cprint ('Updating hashes...', 1)
     with open(dir_local + dir_entry + '/.hash','w') as h:
         for i in up_list:
             s=i + ' ' +  up_list[i] + '\n'
             h.write(s.encode("UTF-8"))
-    cout(25,2,'OK')
     return;
 
-# Upload file
 def sf_ul(dir_entry, ul_list):
+    """ Upload file """
     if not ul_list:
         return
-    for lfile in ul_list:
-        cprint('Uploading new file... ',2)
-        hdr = { 'Authorization' : 'Token ' + token }
+    cclear (2,1,max_x-3)
+    for idx,lfile in enumerate(ul_list):
+        cprint('Uploading '+ str(idx) +' new file of ' + str(len(ul_list)),1)
         uurl = url + '/api2/repos/' + libid + '/upload-link/?p=' + dir_entry
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
         upload_link = r.json()
@@ -301,22 +306,21 @@ def sf_ul(dir_entry, ul_list):
             headers=hdr,
             verify= ca_verify
         )
-        cprint('Updating hashes...', 2)
+        cprint('Updating hashes...', 1)
         with open(dir_local + dir_entry + '/.hash','a') as h:
             s=response.text + ' ' + lfile + '\n'
             h.write(s.encode('utf-8'))
-        cout(25,2,'OK')
     return;
 
 def sf_rm_srv(dir_entry, rm_list):
-    """Removes file(s) from rm_list at the server side
+    """Remove file(s) from rm_list at the server side
        DELETE https://cloud.seafile.com/api2/repos/{repo-id}/file/?p=/foo
     """
     if not rm_list:
         return
-    cprint('Removing on server...', 2)
-    for f in rm_list:
-        hdr = { 'Authorization' : 'Token ' + token }
+    cclear (2,1,max_x-3)
+    for idx,f in enumerate(rm_list):
+        cprint('Removing file '+ str(idx)+' of ' + str(len(rm_list))+ ' on server...', 1)
         uurl = url + '/api2/repos/' + libid + '/file/?p=' + dir_entry + f
         r = requests.delete(uurl, headers=hdr, verify=ca_verify)
         if r.status_code == 200 or r.status_code == 400: ## Removed successfully or doesn't exist on server
@@ -327,7 +331,6 @@ def sf_rm_srv(dir_entry, rm_list):
                 for line in data:
                     if not f in safe_unicode(line):
                         h.write(line)
-    cout(25,2,'OK')
     return;
 
 def sf_get_push():
@@ -340,18 +343,18 @@ def sf_get_push():
                 upfiles.append( os.path.join(r, f) )
     return upfiles;
 
-# Push directory to the server
 def sf_push():
+    """ Push directory to the server """
     files=sf_get_push()
     if not files:
         return
     hashlist=[]
-    for f in files:
+    cclear (2,1,max_x-3)
+    for idx,f in enumerate(files):
         fn = os.path.basename(f)
         fb = safe_unicode(fn)
-        cprint('Updating file...', 2)
+        cprint('Updating file '+ str(idx)+ ' of '+ str(len(files)), 1)
         dir_entry = os.path.relpath(os.path.dirname(f), dir_local)
-        hdr = { 'Authorization' : 'Token ' + token }
         uurl = url + '/api2/repos/' + libid + '/update-link/?p=/' + dir_entry
         r = requests.get(uurl, headers=hdr, verify=ca_verify)
         update_link = r.json()
@@ -380,9 +383,7 @@ def sf_push():
                             hashlist.append(line[0]+ ' ' + name.decode('utf-8'))
                 if inhash == False:
                     hashlist.append( response.text + ' ' + fn.decode('utf-8'))
-                cprint('Updating hashes...', 2)
                 h.writelines(('\n'.join(hashlist) + '\n').encode('utf-8'))
-        cout(25,2,'OK')
     return;
 
 ### --- Main start
@@ -442,11 +443,12 @@ if __name__ == '__main__':
         with open(cfg_file, 'wb') as configfile:
             config.write(configfile)
 
+    hdr = { 'Authorization' : 'Token ' + token }
     rc = sf_authping()
     cprint ('Got ' + rc + ' from server', 1 )
     libid=sf_get_lib_id()
     if not libid:
-        cprint('Error: Library not exist on the server', 1)
+        cprint('Error: Library doesn not exist on the server', 1)
         quit()
     requests.packages.urllib3.fields.format_header_param = utf8_format_header_param
 

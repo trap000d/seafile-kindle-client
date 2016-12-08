@@ -15,7 +15,8 @@ import ConfigParser
 import os
 import sys
 import shutil
-from subprocess import call
+from subprocess import call, Popen, PIPE
+from re import findall
 
 def spinning_cursor():
     while True:
@@ -386,24 +387,24 @@ def sf_push():
                 h.writelines(('\n'.join(hashlist) + '\n').encode('utf-8'))
     return;
 
+def screen_size():
+    cmd = Popen('eips 99 99 " "', shell=True, stdout=PIPE)
+    #eips: pixel_in_range> (1600, 2400) pixel not in range (0..1072, 0..1448)
+    for line in cmd.stdout:
+        l = findall(r'\d+', line)
+        x = 1 + int(l[3])/( int(l[0])/100 )
+        y = int(l[5])/( int(l[1])/100 )
+    return x,y;
+
 ### --- Main start
 
 if __name__ == '__main__':
     requests.packages.urllib3.disable_warnings(SubjectAltNameWarning)
-    config_defaults = { 'url'      :'http://seafile.example.com',
-                        'library'  :'MyLibrary',
-                        'user'     :'user',
-                        'password' :'password',
-                        'cert'     :'True',
-                        'local'    : '/mnt/us/documents/Seafile',
-                        'upload'   : '/MyKindle',
-                        'width'    : '68',
-                        'heigh'    : '60'
-                      }
+
     ### Some hardcoded path
     cfg_dir='/mnt/us/extensions/seafile'
 
-    config = ConfigParser.RawConfigParser(config_defaults)
+    config = ConfigParser.RawConfigParser()
     cfg_file = cfg_dir + '/seafile.cfg'
     config.read( cfg_file )
 
@@ -414,8 +415,8 @@ if __name__ == '__main__':
     cert      = config.get('server', 'cert')
     dir_local = config.get('kindle', 'local')
     dir_push  = config.get('kindle', 'upload')
-    max_x     = int(config.get('kindle', 'width'))
-    max_y     = int(config.get('kindle', 'height'))
+
+    max_x, max_y = screen_size()
 
     if cert == 'False':
         ca_verify = False

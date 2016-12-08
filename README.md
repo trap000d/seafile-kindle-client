@@ -19,9 +19,6 @@ cert = False
 [kindle]
 local = /mnt/us/documents/Seafile
 upload = /MyKindle_1
-; screen dimensions in chars: 68x60 for PW3/KV, 48x42 for PW2
-width  = 68
-height = 60
 ```
 Run it via KUAL menu:
 - KUAL -> Seafile Sync -> Synchronize

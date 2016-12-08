@@ -30,6 +30,16 @@ At the first run script will obtain an authentication token at Seafile server an
 ### Known Issues/Bugs/Limitations
 - Synchronization (download) works pretty well for 100-200 files in 3 sub-dir levels with overall size 1 Gb. For testing a bigger volumes I'll have to re-solder Kindle storage chip and hack firmware.
 - One'n'half-way synchronization (only newly created local files are uploaded to server). As ID of file is generated on the server, there is no reliable way to determine if file is changed locally by it's ID. File timestamp doesn't look good too as kindle clock might reset after cold restart. 
+
+| Event | Supported |
+| ---   | ---       |
+| File created on Kindle | Y |
+| File removed on Kindle | Y |
+| File changed on Kindle | N |
+| File created on server | Y |
+| File removed on server | Y |
+| File changed on server | Y |
+
 - There is an option for uploading of the particular directory contents (useful e.g. for notes synchronization). As all files in that directory have to be uploaded to the server you should be careful: it could take much time.
 - Directory for uploads must exist on the server. You have to create it there (e.g. via web interface or with desktop seafile client) and perform synchronization (download) at least once before upload.
 - Upload directory must be a sub-folder in directory tree, e.g. /mnt/us/documents/Seafile/MyKindle_1. In config it should be defined as relative path to the base directory  
